@@ -13,6 +13,7 @@ HIGHLIGHT_TEXT = (0, 0, 0)
 MESSAGE_BG = (0, 70, 140)
 PROGRESS = (0, 160, 0)           # dark green bar on the yellow box
 PROGRESS_H = 24
+ALERT_BG = (200, 0, 0)           # emergency red
 
 COLS = 3
 MARGIN = 20
@@ -28,6 +29,7 @@ class Board:
         self.screen = pygame.display.set_mode(size)
         self.option_font = pygame.font.SysFont("arial", 64, bold=True)
         self.message_font = pygame.font.SysFont("arial", 72, bold=True)
+        self.banner_font = pygame.font.SysFont("arial", 140, bold=True)
 
     def handle_events(self) -> bool:
         """Drain events. Returns False when the window is closed."""
@@ -37,11 +39,13 @@ class Board:
         return True                       # all mouse/keyboard input ignored
 
     def draw(self, options: list[str], highlighted_index: int,
-             message: str, progress: float = 0.0) -> None:
+             message: str, progress: float = 0.0,
+             banner: str | None = None) -> None:
         """Draw the whole screen for one frame.
 
         progress (0..1) fills a bar along the bottom of the highlighted box
-        while the user holds a gesture.
+        while the user holds a gesture. banner, if given, is shown as a big
+        red alert over the options.
         """
         self.screen.fill(BG)
         for i, option in enumerate(options):
@@ -50,6 +54,8 @@ class Board:
             if i == highlighted_index:
                 self._draw_progress(rect, progress)
         self._draw_message(message)
+        if banner:
+            self._draw_banner(banner)
         pygame.display.flip()
 
     def _box_rect(self, i: int, count: int) -> pygame.Rect:
@@ -83,6 +89,14 @@ class Board:
         bar = pygame.Rect(inner.left, rect.bottom - MARGIN - PROGRESS_H,
                           width, PROGRESS_H)
         pygame.draw.rect(self.screen, PROGRESS, bar, border_radius=8)
+
+    def _draw_banner(self, text: str) -> None:
+        """Big red alert covering the options grid."""
+        width, height = self.screen.get_size()
+        rect = pygame.Rect(0, 0, width, height - MESSAGE_H - 2 * MARGIN)
+        pygame.draw.rect(self.screen, ALERT_BG, rect)
+        pygame.draw.rect(self.screen, TEXT, rect, width=16)
+        self._blit_centered(self.banner_font, text, TEXT, rect)
 
     def _draw_message(self, message: str) -> None:
         """The big bar at the bottom showing what was selected."""

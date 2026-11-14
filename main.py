@@ -1,6 +1,7 @@
 # SignalSpeak main program: calibrate two gestures, then let the user pick
 # a need from a scanning board and have it spoken aloud.
-#   eyebrows (hold) = select    mouth open (hold) = undo
+#   eyebrows (hold) = select    mouth open (short hold) = undo
+#   mouth open held 2 s = emergency "I need help now" (undo clears it)
 # After the demo starts, no mouse/keyboard/voice input is used.
 # Own design; generated with help from Claude (Anthropic) - see AI_USAGE.md.
 import time
@@ -10,6 +11,7 @@ import cv2
 import speech
 from board import Board
 from calibration import calibrate
+from emergency import ALERT, UNDO, EmergencyAlert, JawGestures
 from gestures import GestureDetector
 from scanner import Scanner
 from tracker import Tracker
@@ -29,6 +31,22 @@ def calibrate_with_retry(tracker, signal, label, attempts=3):
     return None
 
 
+def handle_jaw(event, alert, scanner, message):
+    """Act on a jaw event; returns the new board message."""
+    if event == ALERT:
+        phrase = alert.trigger()
+        if phrase:
+            speech.speak(phrase)
+        return "Help is on the way. Open mouth briefly to cancel."
+    if event == UNDO:
+        if alert.active:
+            alert.clear()
+            return "Alert cancelled"
+        cancelled = scanner.undo()
+        return f"Cancelled: {cancelled}" if cancelled else ""
+    return message
+
+
 def main():
     tracker = Tracker()
     select_range = calibrate_with_retry(tracker, SELECT_SIGNAL,
@@ -41,7 +59,8 @@ def main():
         return
 
     select_gesture = GestureDetector(SELECT_SIGNAL, *select_range)
-    undo_gesture = GestureDetector(UNDO_SIGNAL, *undo_range, hold_s=0.6)
+    jaw = JawGestures(*undo_range, signal=UNDO_SIGNAL)   # undo + alert
+    alert = EmergencyAlert()
     scanner = Scanner(OPTIONS)
     # Start the voice BEFORE pygame opens, so pygame's audio setup
     # doesn't take over the sound device first.
@@ -53,17 +72,17 @@ def main():
     while board.handle_events():
         _, scores = tracker.read()
         now = time.time()
-        scanner.update(now)
+        if not alert.active:              # scanning pauses during an alert
+            scanner.update(now)
         if scores:
+            message = handle_jaw(jaw.update(scores[UNDO_SIGNAL], now),
+                                 alert, scanner, message)
             if (select_gesture.update(scores[SELECT_SIGNAL], now)
-                    and not scanner.is_paused()):
+                    and not alert.active and not scanner.is_paused()):
                 message = scanner.select()
                 speech.speak(message)
-            if undo_gesture.update(scores[UNDO_SIGNAL], now):
-                cancelled = scanner.undo()
-                message = f"Cancelled: {cancelled}" if cancelled else ""
         board.draw(OPTIONS, scanner.index, message,
-                   select_gesture.progress(now))
+                   select_gesture.progress(now), alert.banner())
 
     tracker.close()
 
