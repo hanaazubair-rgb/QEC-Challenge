@@ -1,6 +1,6 @@
 # Written with help from Claude Code (Anthropic); colours, font, text
-# fitting, progress bar and alert banner revised with Claude - see
-# AI_USAGE.md.
+# fitting, progress bar, alert banner and screen scaling revised with
+# Claude - see AI_USAGE.md.
 # Uses pygame-ce for drawing https://pyga.me/docs/
 # The needs board screen. It is display-only: mouse and keyboard events are
 # ignored (competition rule); only closing the window is handled.
@@ -38,7 +38,10 @@ class Board:
     def __init__(self, size: tuple[int, int] = (1200, 800)) -> None:
         pygame.init()
         pygame.display.set_caption("SignalSpeak")
-        self.screen = pygame.display.set_mode(size)
+        # SCALED fits the picture to the real screen (no cut-off at any
+        # display scaling); RESIZABLE adds a maximize button.
+        self.screen = pygame.display.set_mode(
+            size, pygame.SCALED | pygame.RESIZABLE)
         self._fonts: dict[int, pygame.font.Font] = {}
 
     def handle_events(self) -> bool:
