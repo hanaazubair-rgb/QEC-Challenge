@@ -44,6 +44,16 @@ class GestureDetector:
         self.off_frac = min(self.off_frac, self.on_frac - 0.1)
         self._update_levels()
 
+    def progress(self, now):
+        """How far through the hold the user is: 0..1.
+
+        0 when no gesture is being held or it has already fired, so a UI
+        can draw a filling bar while the user holds the gesture.
+        """
+        if not self.active or self.fired:
+            return 0.0
+        return min(max((now - self.start) / self.hold_s, 0.0), 1.0)
+
     def update(self, value, now):
         """Feed one reading. Returns True once when held long enough."""
         if not self.active:

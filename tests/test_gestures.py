@@ -113,3 +113,25 @@ def test_bad_calibration_raises():
     g = make()
     with pytest.raises(ValueError):
         g.set_range(0.6, 0.4)
+
+
+def test_progress_is_zero_when_not_holding():
+    g = make()
+    assert g.progress(0.0) == 0.0
+    g.update(0.2, 0.0)              # below the on level
+    assert g.progress(0.1) == 0.0
+
+
+def test_progress_fills_during_hold():
+    g = make()                      # hold_s = 0.4
+    g.update(0.8, 1.0)
+    assert g.progress(1.0) == 0.0
+    assert abs(g.progress(1.2) - 0.5) < 1e-9
+    assert g.progress(5.0) == 1.0   # capped at full
+
+
+def test_progress_resets_after_firing():
+    g = make()
+    g.update(0.8, 0.0)
+    assert g.update(0.8, 0.5)
+    assert g.progress(0.6) == 0.0
