@@ -91,6 +91,16 @@ def test_slow_down_changes_timing():
     assert s.update(2.0) == 1
 
 
+def test_set_options_switches_screen_and_resets():
+    s = make()
+    s.update(3.0)
+    s.select()
+    s.set_options(["Confirm", "Cancel"])
+    assert s.options == ["Confirm", "Cancel"]
+    assert s.index == 0
+    assert s.last_selection is None
+
+
 def test_empty_options_rejected():
     with pytest.raises(ValueError):
         Scanner([])

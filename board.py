@@ -76,6 +76,10 @@ class Board:
 
     def _blit_centered(self, font: pygame.font.Font, text: str,
                        color: tuple[int, int, int], rect: pygame.Rect) -> None:
-        """Draw text centred inside rect."""
+        """Draw text centred inside rect, shrinking it if it is too wide."""
         surface = font.render(text, True, color)
+        max_w = rect.width - 2 * MARGIN
+        if surface.get_width() > max_w:
+            scale = max_w / surface.get_width()
+            surface = pygame.transform.smoothscale_by(surface, scale)
         self.screen.blit(surface, surface.get_rect(center=rect.center))

@@ -61,6 +61,15 @@ class Scanner:
         self.index = (self.index - 1) % len(self.options)
         return None
 
+    def set_options(self, options: list[str]) -> None:
+        """Switch to a new screen of options, starting from the first."""
+        if not options:
+            raise ValueError("Scanner needs at least one option")
+        self.options = list(options)
+        self.index = 0
+        self.last_selection = None
+        self._last_step = self._now
+
     def slow_down(self) -> float:
         """Make scanning slower (for when the user tires). Returns step_s."""
         self.step_s = min(self.step_s + self.slow_step_s, self.max_step_s)
