@@ -2,18 +2,32 @@
 # https://pypi.org/project/pyttsx3/ [library, cited in presentation].
 # pyttsx3's engine goes silent after the first phrase on Windows when it is
 # reused, so each phrase is spoken by a fresh short-lived process. A new
-# phrase cuts off the previous one. Written with help from Claude
-# (Anthropic) - see AI_USAGE.md.
+# phrase cuts off the previous one. Prefers a Canadian (then any female)
+# voice if installed. Written with help from Claude (Anthropic) - see
+# AI_USAGE.md.
 import subprocess
 import sys
 
-_SAY = (
-    "import sys, pyttsx3\n"
-    "e = pyttsx3.init()\n"
-    "e.setProperty('rate', 150)\n"
-    "e.say(sys.argv[1])\n"
-    "e.runAndWait()\n"
-)
+_SAY = """
+import sys, pyttsx3
+# Earlier names win: Canadian first, then other female voices.
+PREFERRED = ("canada", "linda", "zira", "hazel", "susan", "female")
+e = pyttsx3.init()
+e.setProperty("rate", 150)
+voices = e.getProperty("voices")
+chosen = None
+for name in PREFERRED:
+    for voice in voices:
+        if name in voice.name.lower():
+            chosen = voice
+            break
+    if chosen:
+        break
+if chosen:
+    e.setProperty("voice", chosen.id)
+e.say(sys.argv[1])
+e.runAndWait()
+"""
 
 _process = None
 
