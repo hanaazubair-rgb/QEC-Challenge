@@ -1,68 +1,51 @@
 # Written with help from Claude Code (Anthropic) - see AI_USAGE.md.
 # Fatigue monitor for SignalSpeak (personalization). People with ALS tire
-# during a session: gestures get weaker and selecting takes longer. This
-# notices that and makes the app easier to use: slower scanning and a lower
-# gesture threshold. Pure Python, no pygame/cv2, so it is unit-testable.
+# during a session: gestures get weaker and come further apart. This
+# notices that so the app can slow scanning and ease the gesture threshold.
+# Pure Python, no pygame/cv2, so it is unit-testable.
 
 from statistics import mean
-from typing import Protocol
 
-WINDOW = 5               # gestures per average
-STRENGTH_DROP = 0.25     # 25% weaker than the start = tired
-SLOWER_BY = 0.25         # 25% slower than the start = tired
-
-
-class SlowableScanner(Protocol):
-    def slow_down(self) -> float: ...
-
-
-class Easable(Protocol):
-    def ease(self, factor: float = 0.85) -> None: ...
+WINDOW = 5               # gestures compared at the start vs. most recently
+STRENGTH_DROP = 0.25     # last 5 are 25%+ weaker than the first 5 = tired
+GAP_GROWTH = 0.50        # last 5 are 50%+ further apart than the first 5
+MIN_GESTURES = 2 * WINDOW
 
 
 class FatigueMonitor:
-    """Watch gesture strength and selection time; adapt when the user tires."""
+    """Compare the user's first gestures with their most recent ones."""
 
-    def __init__(self, scanner: SlowableScanner, detector: Easable) -> None:
-        self.scanner = scanner
-        self.detector = detector
+    def __init__(self) -> None:
         self.strengths: list[float] = []
         self.times: list[float] = []
-        self.adaptations = 0
 
-    def record(self, strength: float, select_time_s: float) -> bool:
-        """Log one selection. Returns True if the app was adapted."""
+    def record(self, strength: float, now: float) -> None:
+        """Store one gesture's strength (0-1) and when it happened."""
         self.strengths.append(strength)
-        self.times.append(select_time_s)
-        if not self.is_fatigued():
+        self.times.append(now)
+
+    def is_tired(self) -> bool:
+        """True if gestures got much weaker or much further apart."""
+        if len(self.strengths) < MIN_GESTURES:
             return False
-        self._adapt()
-        return True
+        return self._weaker() or self._slower()
 
-    def is_fatigued(self) -> bool:
-        """Compare the last 5 gestures with the first 5 of this period."""
-        if len(self.strengths) < 2 * WINDOW:
-            return False
-        weaker = self._recent(self.strengths) <= (
-            (1 - STRENGTH_DROP) * self._start(self.strengths))
-        slower = self._recent(self.times) >= (
-            (1 + SLOWER_BY) * self._start(self.times))
-        return weaker or slower
+    def reset(self) -> None:
+        """Clear history, e.g. right after the app has adapted."""
+        self.strengths.clear()
+        self.times.clear()
 
-    def _adapt(self) -> None:
-        """Slow scanning, lower the threshold, and start a fresh baseline."""
-        self.scanner.slow_down()
-        self.detector.ease()          # weaker gestures now count
-        self.adaptations += 1
-        # The tired level becomes the new "start", so we only react again
-        # if the user gets even more tired.
-        self.strengths = self.strengths[-WINDOW:]
-        self.times = self.times[-WINDOW:]
+    def _weaker(self) -> bool:
+        first = mean(self.strengths[:WINDOW])
+        last = mean(self.strengths[-WINDOW:])
+        return last <= (1 - STRENGTH_DROP) * first
 
-    @staticmethod
-    def _start(values: list[float]) -> float:
-        return mean(values[:WINDOW])
+    def _slower(self) -> bool:
+        first = _mean_gap(self.times[:WINDOW])
+        last = _mean_gap(self.times[-WINDOW:])
+        return last >= (1 + GAP_GROWTH) * first
 
-    @staticmethod
-    def _recent(values: list[float]) -> float:
-        return mean(values[-WINDOW:])
+
+def _mean_gap(times: list[float]) -> float:
+    """Average time between consecutive gestures."""
+    return mean(b - a for a, b in zip(times, times[1:]))
