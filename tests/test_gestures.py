@@ -23,9 +23,19 @@ def test_fires_again_after_release():
     g = make()
     g.update(0.8, 0.0)
     assert g.update(0.8, 0.5)
-    g.update(0.2, 0.6)              # release
+    g.update(0.2, 0.6)              # goes low
+    g.update(0.2, 0.9)              # stays low 0.3 s -> released
     g.update(0.8, 1.0)
     assert g.update(0.8, 1.5)
+
+
+def test_brief_dip_does_not_retrigger():
+    g = make()
+    g.update(0.8, 0.0)
+    assert g.update(0.8, 0.5)
+    g.update(0.2, 0.6)              # flicker low for 0.1 s
+    g.update(0.8, 0.7)              # back up: still the same hold
+    assert not g.update(0.8, 1.2)   # must not fire a second time
 
 
 def test_recalibration_changes_threshold():
