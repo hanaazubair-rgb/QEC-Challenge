@@ -1,16 +1,10 @@
-<<<<<<< HEAD
 # SignalSpeak main program: calibrate two gestures (or load a saved
 # profile), then let the user pick a need from a scanning board (with
 # confirm step and pain scale) and have it spoken aloud. Adapts when the
 # user tires (fatigue.py).
-#   eyebrows (hold) = select    mouth open (hold) = undo / cancel
-# Run: python main.py [--user NAME] [--recalibrate]
-=======
-# SignalSpeak main program: calibrate two gestures, then let the user pick
-# a need from a scanning board and have it spoken aloud.
-#   eyebrows (hold) = select    mouth open (short hold) = undo
+#   eyebrows (hold) = select    mouth open (short hold) = undo / cancel
 #   mouth open held 2 s = emergency "I need help now" (undo clears it)
->>>>>>> d126a364a7697efaf5b5e2806c6bc0de3dd0bab6
+# Run: python main.py [--user NAME] [--recalibrate]
 # After the demo starts, no mouse/keyboard/voice input is used.
 # Own design; generated with help from Claude (Anthropic) - see AI_USAGE.md.
 import argparse
@@ -21,12 +15,9 @@ import cv2
 import speech
 from board import Board
 from calibration import calibrate
-<<<<<<< HEAD
+from emergency import ALERT, UNDO, EmergencyAlert, JawGestures
 from fatigue import FatigueMonitor
 from flow import CONFIRM, MAIN_OPTIONS, Flow
-=======
-from emergency import ALERT, UNDO, EmergencyAlert, JawGestures
->>>>>>> d126a364a7697efaf5b5e2806c6bc0de3dd0bab6
 from gestures import GestureDetector
 from scanner import Scanner
 from tracker import Tracker
@@ -35,6 +26,7 @@ from user_profile import load_profile, save_profile
 SELECT_SIGNAL = "browInnerUp"
 UNDO_SIGNAL = "jawOpen"
 NOTICE_S = 3.0
+ALERT_MESSAGE = "Help is on the way. Open mouth briefly to cancel."
 
 # Full sentences for the short main-board labels (pain already is one).
 PHRASES = {
@@ -65,33 +57,12 @@ def calibrate_with_retry(tracker, signal, label, attempts=3):
     return None
 
 
-<<<<<<< HEAD
 def get_profile(tracker, user, recalibrate):
     """Saved profile if there is one, else calibrate and save a new one."""
     profile = None if recalibrate else load_profile(user)
     if profile:
         print(f"Loaded saved profile '{user}'.")
         return profile
-=======
-def handle_jaw(event, alert, scanner, message):
-    """Act on a jaw event; returns the new board message."""
-    if event == ALERT:
-        phrase = alert.trigger()
-        if phrase:
-            speech.speak(phrase)
-        return "Help is on the way. Open mouth briefly to cancel."
-    if event == UNDO:
-        if alert.active:
-            alert.clear()
-            return "Alert cancelled"
-        cancelled = scanner.undo()
-        return f"Cancelled: {cancelled}" if cancelled else ""
-    return message
-
-
-def main():
-    tracker = Tracker()
->>>>>>> d126a364a7697efaf5b5e2806c6bc0de3dd0bab6
     select_range = calibrate_with_retry(tracker, SELECT_SIGNAL,
                                         "raise your eyebrows")
     undo_range = calibrate_with_retry(tracker, UNDO_SIGNAL, "open your mouth")
@@ -113,6 +84,21 @@ def handle_undo(flow):
         flow.scanner.undo()
 
 
+def handle_jaw(event, alert, flow):
+    """Act on a jaw event; returns a short notice to show, or ''."""
+    if event == ALERT:
+        phrase = alert.trigger()
+        if phrase:
+            speech.speak(phrase)
+        return ""
+    if event == UNDO:
+        if alert.active:
+            alert.clear()
+            return "Alert cancelled"
+        handle_undo(flow)
+    return ""
+
+
 def main():
     args = parse_args()
     tracker = Tracker()
@@ -122,9 +108,9 @@ def main():
         tracker.close()
         return
 
-<<<<<<< HEAD
     select_gesture = GestureDetector(SELECT_SIGNAL, *profile["select"])
-    undo_gesture = GestureDetector(UNDO_SIGNAL, *profile["undo"], hold_s=0.6)
+    jaw = JawGestures(*profile["undo"], signal=UNDO_SIGNAL)   # undo + alert
+    alert = EmergencyAlert()
     scanner = Scanner(MAIN_OPTIONS)
     saved_step = profile.get("step_s")
     if isinstance(saved_step, (int, float)) and saved_step > 0:
@@ -133,12 +119,6 @@ def main():
     monitor = FatigueMonitor()
     notice, notice_until = "", 0.0
 
-=======
-    select_gesture = GestureDetector(SELECT_SIGNAL, *select_range)
-    jaw = JawGestures(*undo_range, signal=UNDO_SIGNAL)   # undo + alert
-    alert = EmergencyAlert()
-    scanner = Scanner(OPTIONS)
->>>>>>> d126a364a7697efaf5b5e2806c6bc0de3dd0bab6
     # Start the voice BEFORE pygame opens, so pygame's audio setup
     # doesn't take over the sound device first.
     speech.speak("SignalSpeak ready")
@@ -151,11 +131,11 @@ def main():
         if not alert.active:              # scanning pauses during an alert
             scanner.update(now)
         if scores:
-            message = handle_jaw(jaw.update(scores[UNDO_SIGNAL], now),
-                                 alert, scanner, message)
+            text = handle_jaw(jaw.update(scores[UNDO_SIGNAL], now), alert, flow)
+            if text:
+                notice, notice_until = text, now + NOTICE_S
             if (select_gesture.update(scores[SELECT_SIGNAL], now)
-<<<<<<< HEAD
-                    and not scanner.is_paused()):
+                    and not alert.active and not scanner.is_paused()):
                 monitor.record(select_gesture.last_strength, now)
                 spoken = flow.select()
                 if spoken:
@@ -166,17 +146,14 @@ def main():
                     monitor.reset()
                     notice = "Getting tired? Slowing down to help."
                     notice_until = now + NOTICE_S
-            if undo_gesture.update(scores[UNDO_SIGNAL], now):
-                handle_undo(flow)
-        shown = notice if now < notice_until else flow.message
-        board.draw(flow.options, scanner.index, shown)
-=======
-                    and not alert.active and not scanner.is_paused()):
-                message = scanner.select()
-                speech.speak(message)
-        board.draw(OPTIONS, scanner.index, message,
+        if alert.active:
+            shown = ALERT_MESSAGE
+        elif now < notice_until:
+            shown = notice
+        else:
+            shown = flow.message
+        board.draw(flow.options, scanner.index, shown,
                    select_gesture.progress(now), alert.banner())
->>>>>>> d126a364a7697efaf5b5e2806c6bc0de3dd0bab6
 
     profile["step_s"] = scanner.step_s
     save_profile(args.user, profile)
