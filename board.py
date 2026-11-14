@@ -11,6 +11,8 @@ TEXT = (255, 255, 255)
 HIGHLIGHT = (255, 220, 0)        # bright yellow on black = high contrast
 HIGHLIGHT_TEXT = (0, 0, 0)
 MESSAGE_BG = (0, 70, 140)
+PROGRESS = (0, 160, 0)           # dark green bar on the yellow box
+PROGRESS_H = 24
 
 COLS = 3
 MARGIN = 20
@@ -35,12 +37,18 @@ class Board:
         return True                       # all mouse/keyboard input ignored
 
     def draw(self, options: list[str], highlighted_index: int,
-             message: str) -> None:
-        """Draw the whole screen for one frame."""
+             message: str, progress: float = 0.0) -> None:
+        """Draw the whole screen for one frame.
+
+        progress (0..1) fills a bar along the bottom of the highlighted box
+        while the user holds a gesture.
+        """
         self.screen.fill(BG)
         for i, option in enumerate(options):
             rect = self._box_rect(i, len(options))
             self._draw_box(rect, option, i == highlighted_index)
+            if i == highlighted_index:
+                self._draw_progress(rect, progress)
         self._draw_message(message)
         pygame.display.flip()
 
@@ -65,6 +73,16 @@ class Board:
             pygame.draw.rect(self.screen, TEXT, rect, width=10,
                              border_radius=16)
         self._blit_centered(self.option_font, label, color, rect)
+
+    def _draw_progress(self, rect: pygame.Rect, progress: float) -> None:
+        """Bar along the bottom of a box, filled from left to right."""
+        if progress <= 0:
+            return
+        inner = rect.inflate(-2 * MARGIN, 0)
+        width = int(inner.width * min(progress, 1.0))
+        bar = pygame.Rect(inner.left, rect.bottom - MARGIN - PROGRESS_H,
+                          width, PROGRESS_H)
+        pygame.draw.rect(self.screen, PROGRESS, bar, border_radius=8)
 
     def _draw_message(self, message: str) -> None:
         """The big bar at the bottom showing what was selected."""

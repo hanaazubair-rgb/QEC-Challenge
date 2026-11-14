@@ -62,7 +62,8 @@ def main():
             if undo_gesture.update(scores[UNDO_SIGNAL], now):
                 cancelled = scanner.undo()
                 message = f"Cancelled: {cancelled}" if cancelled else ""
-        board.draw(OPTIONS, scanner.index, message)
+        board.draw(OPTIONS, scanner.index, message,
+                   select_gesture.progress(now))
 
     tracker.close()
 
